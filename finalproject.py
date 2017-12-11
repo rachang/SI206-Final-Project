@@ -2,14 +2,16 @@
 ## Final Project
 import unittest
 import itertools
-import collections
+from collections import Counter
 import json
 import sqlite3
 import facebook
 import api_access
 import requests
 from datetime import datetime
-
+import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
 CACHE_FNAME = "fbfinalproject.json"
 # Put the rest of your caching setup here:
 try:
@@ -52,26 +54,27 @@ conn = sqlite3.connect('finalproject.sqlite')
 cur = conn.cursor()
 #create table within database for Facebook API
 cur.execute("DROP TABLE IF EXISTS Facebook_Posts")
-cur.execute('''CREATE TABLE Facebook_Posts (user_id TEXT, created_time DATETIME, weekday TEXT, timeperiod TEXT, message TEXT, story TEXT)''')
-#looping through every post and getting the user id, created time, message, story
+cur.execute('''CREATE TABLE Facebook_Posts (post_id TEXT, created_time DATETIME, weekday TEXT, timeperiod TEXT, message TEXT, story TEXT)''')
+#looping through every post and retrieving the post id, created time, message, story
 #from created time, finding the weekday and time period
 for posts in fbposts["data"]:
-	user_id = posts["id"]
+	post_id = posts["id"]
 	created_time = posts["created_time"]
-	#finding the 
+	#converting created_time to datetime syntax
 	created_time = datetime.strptime(created_time, "%Y-%m-%dT%H:%M:%S%z")
+	#finding weekday from created_time
 	weekday = datetime.strftime(created_time,"%A")
+	#finding time of day from created_time and categorizing time of day into 4 time periods
 	timeofday = int(datetime.strftime(created_time, "%H%M"))
 	timeperiod = ""
 	if timeofday >= 0 and timeofday <= 559:
-		timeperiod = "early morning"
+		timeperiod = "Early Morning"
 	elif timeofday >= 600 and timeofday <= 1159:
-		timeperiod = "morning"
+		timeperiod = "Morning"
 	elif timeofday >= 1200 and timeofday <= 1759:
-		timeperiod = "afternoon"
+		timeperiod = "Afternoon"
 	else:
-		timeperiod = "night" 
-	print (created_time, weekday, timeperiod)
+		timeperiod = "Night" 
 	#some posts only have stories, some only have messages, some have both
 	if "story" in posts:
 		story = posts["story"]
@@ -81,7 +84,21 @@ for posts in fbposts["data"]:
 		message = posts["message"]
 	else:
 		message = ""
-	cur.execute('''INSERT or IGNORE INTO Facebook_Posts (user_id, created_time, weekday, timeperiod, message, story) VALUES (?,?,?,?,?,?)'''
-		, (user_id, created_time, weekday, timeperiod, message, story))
+	#writing in all 6 columns into table
+	cur.execute('''INSERT or IGNORE INTO Facebook_Posts (post_id, created_time, weekday, timeperiod, message, story) VALUES (?,?,?,?,?,?)'''
+		, (post_id, created_time, weekday, timeperiod, message, story))
 conn.commit()
+#datetime report of days most active on Facebook
+activity_by_day = []
+activity_by_time_period = []
+total_activity =[]
+weekday = cur.execute("SELECT weekday, timeperiod FROM Facebook_Posts")
+for row in weekday:
+	activity_by_day.append(row[0])
+	activity_by_time_period.append(row[1])
+	total_activity.append(row)
+
+print("Activity tracked by day: \n", Counter(activity_by_day))
+print("Activity tracked by time period: \n", Counter(activity_by_time_period))
+print("Activity tracked by day and time period combined: \n", Counter(total_activity))
 cur.close()
